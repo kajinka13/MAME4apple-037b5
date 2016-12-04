@@ -10,6 +10,8 @@
 #import <GameController/GameController.h>
 #import <CloudKit/CloudKit.h>
 #include "driver.h"
+#import "HeaderView.h"
+#import "SearchVC.h"
 
 #if TARGET_OS_TV
 #define USE_TABLEVIEW 0
@@ -24,7 +26,7 @@
 #endif
 #define USE_RENDERTHREAD 0
 
-#define VERSION_STRING "V1.1"
+#define VERSION_STRING "v1.1"
 
 extern void parse_cmdline(int argc, char **argv, int game_index, char *override_default_rompath);
 
@@ -144,24 +146,35 @@ GameScene *myObjectSelf;
     runState = 1;
 }
 
--(NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
-{
-    static NSString *string = nil;
-    if (string == nil)
-    {
-        string = [NSString stringWithFormat:@"MAME4apple %s 2016 by Les Bird (www.lesbird.com)", VERSION_STRING];
+//-(NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+//{
+//    static NSString *string = nil;
+//    if (string == nil)
+//    {
+//        string = [NSString stringWithFormat:@"MAME4apple %s 2016 by Les Bird (www.lesbird.com)", VERSION_STRING];
+//    }
+//    return string;
+//}
+
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+    HeaderView *view = (HeaderView *)[tableView dequeueReusableHeaderFooterViewWithIdentifier:[HeaderView sectionIndentifier]];
+    
+    if (view == nil) {
+        view = [HeaderView nibView];
     }
-    return string;
+    
+    [view configure:[NSString stringWithFormat:@"MAME4apple %s 2016 by Les Bird (www.lesbird.com)", VERSION_STRING] actionSearch:^{
+        UIViewController *vc = [[[self view] window] rootViewController];
+        
+        [vc performSegueWithIdentifier:@"segueSearch" sender:vc];
+    }];
+    
+    return view;
 }
 
 -(NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
 {
-    static NSString *string = nil;
-    if (string == nil)
-    {
-        string = [NSString stringWithFormat:@"%d games", gameDriverROMCount];
-    }
-    return string;
+    return [NSString stringWithFormat:@"%d games", gameDriverROMCount];
 }
 
 -(NSArray *)sectionIndexTitlesForTableView:(UITableView *)tableView
@@ -420,7 +433,7 @@ int list_step = 40; // gap between lines in game list
     char *argv[] = {""};
     parse_cmdline(0, argv, game_index, nil);
     
-    [self checkAvailableROMs];
+    [self checkAvailableROMs:NO];
     
 #if USE_TABLEVIEW
     [gameDriverTableView reloadData];
@@ -428,7 +441,13 @@ int list_step = 40; // gap between lines in game list
     [self updateGameList];
 #endif
     
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(updateRoms) name:@"UPDATE_ROMSET" object:nil];
+    
     myObjectSelf = self;
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 -(void)initAndSortDriverArray
@@ -471,14 +490,24 @@ int list_step = 40; // gap between lines in game list
 
 extern const char *getROMpath();
 
--(void)checkAvailableROMs
+- (void)updateRoms {
+    [self checkAvailableROMs:YES];
+    selected_game = -1;
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [gameDriverTableView reloadData];
+    });
+}
+
+-(void)checkAvailableROMs:(BOOL)update
 {
     int count = 0;
+    NSString *romsPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/roms"];
     
     BOOL bIsDir;
     for (int i = 0; i < gameDriverCount; i++)
     {
-        NSString *path = [NSString stringWithUTF8String:getROMpath()];
+        NSString *path = [NSString stringWithUTF8String:((update == NO) ? getROMpath() : [romsPath cStringUsingEncoding:NSUTF8StringEncoding])];
         path = [path stringByAppendingPathComponent:[NSString stringWithUTF8String:gameDriverList[i].gameDriver->name]];
         path = [path stringByAppendingPathExtension:@"zip"];
         if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&bIsDir])
