@@ -26,7 +26,7 @@
 #endif
 #define USE_RENDERTHREAD 0
 
-#define VERSION_STRING "v1.1"
+#define VERSION_STRING "V1.2"
 
 extern void parse_cmdline(int argc, char **argv, int game_index, char *override_default_rompath);
 
@@ -772,6 +772,8 @@ UINT32 gameScreenHeight;
 // allocate a frame buffer for the emulated game
 -(void)alloc_frame_buffer:(int)width :(int)height :(int)depth :(int)attributes :(int)orientation
 {
+    NSLog(@"alloc_frame_buffer width=%d height=%d", width, height);
+    
     gameScreenWidth = width;
     gameScreenHeight = height;
     
@@ -818,6 +820,12 @@ void fillBufferData(UINT32 *buf, int width, int height)
     
     UINT32 w = width;
     UINT32 h = height;
+    
+    NSLog(@"computeFrameBufferScale w=%d h=%d sizex=%d sizey=%d minx=%d miny=%d maxx=%d maxy=%d", w, h,
+          Machine->scrbitmap->width, Machine->scrbitmap->height,
+          Machine->drv->default_visible_area.min_x, Machine->drv->default_visible_area.min_y,
+          Machine->drv->default_visible_area.max_x, Machine->drv->default_visible_area.max_y);
+    
     if (Machine != nil && Machine->drv != nil)
     {
         // handle oddball aspect ratios like Blasteroids
